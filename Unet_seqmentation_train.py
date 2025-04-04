@@ -123,6 +123,11 @@ loss_history = []
 dice_history = []
 val_loss_history = []
 
+# === Early Stopping 設定 ===
+patience = 3
+counter = 0
+best_val_loss = float("inf")
+
 for epoch in range(num_epochs):
     model.train()
     train_loss = 0.0
@@ -169,6 +174,17 @@ for epoch in range(num_epochs):
         torch.save(model.state_dict(), "weights/unet_task3_best.pt")
         print(f"💾 儲存最佳模型（loss: {best_loss:.4f}）")
 
+    # Early stopping 檢查
+    if avg_val_loss < best_val_loss:
+        best_val_loss = avg_val_loss
+        counter = 0
+    else:
+        counter += 1
+        print(f"⚠️ 驗證損失未改善：{counter}/{patience}")
+        if counter >= patience:
+            print("🛑 早停條件達成，結束訓練")
+            break
+
     random_idx = random.randint(0, len(val_dataset) - 1)
     visualize_prediction(model, val_dataset, index=random_idx, device=device)
 
@@ -186,21 +202,21 @@ with open("weights/val_loss_history.json", "w") as f:
 # 畫出 Loss、Val Loss、Dice 曲線
 plt.figure(figsize=(15, 4))
 plt.subplot(1, 3, 1)
-plt.plot(range(1, num_epochs + 1), loss_history, marker='o')
+plt.plot(range(1, len(loss_history) + 1), loss_history, marker='o')
 plt.title("Training Loss Curve")
 plt.xlabel("Epoch")
 plt.ylabel("Loss")
 plt.grid(True)
 
 plt.subplot(1, 3, 2)
-plt.plot(range(1, num_epochs + 1), val_loss_history, marker='o', color='green')
+plt.plot(range(1, len(val_loss_history) + 1), val_loss_history, marker='o', color='green')
 plt.title("Validation Loss Curve")
 plt.xlabel("Epoch")
 plt.ylabel("Val Loss")
 plt.grid(True)
 
 plt.subplot(1, 3, 3)
-plt.plot(range(1, num_epochs + 1), dice_history, marker='o', color='orange')
+plt.plot(range(1, len(dice_history) + 1), dice_history, marker='o', color='orange')
 plt.title("Validation Dice Curve")
 plt.xlabel("Epoch")
 plt.ylabel("Dice Score")
