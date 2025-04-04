@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from tqdm import tqdm
 import random
+import json
+import pandas as pd
 
 # === 自訂 Dataset 類別 ===
 class SegDataset(Dataset):
@@ -88,20 +90,24 @@ def calculate_metrics(model, dataloader, device="cpu"):
     print(f"Sensitivity:    {sensitivity:.4f}")
     print(f"Specificity:    {specificity:.4f}")
 
+    df = pd.DataFrame({
+        "Metric": ["Dice Score", "IoU", "Sensitivity", "Specificity"],
+        "Value": [dice, iou, sensitivity, specificity]
+    })
+    df.to_excel("weights/segmentation_metrics.xlsx", index=False)
+    print("📄 指標已儲存至 segmentation_metrics.xlsx")
+
 # === 主要程式開始 ===
-# 資料路徑（請改成你自己的）
 seg_path = "/Users/chia-huitsao/Documents/PHE-SICH-CT-IDS/Task3/seg_dataset"
 train_dataset = SegDataset(f"{seg_path}/images/train", f"{seg_path}/masks/train")
 val_dataset = SegDataset(f"{seg_path}/images/val", f"{seg_path}/masks/val")
 train_loader = DataLoader(train_dataset, batch_size=2, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=2, shuffle=False)
 
-# 模型設定
 model = smp.Unet(encoder_name="resnet34", encoder_weights="imagenet", in_channels=3, classes=1)
 device = torch.device("cpu")
 model = model.to(device)
 
-# Loss 函數設定
 bce_loss = nn.BCEWithLogitsLoss()
 dice_loss = smp.losses.DiceLoss(mode='binary')
 
@@ -109,14 +115,13 @@ def combined_loss(pred, target):
     return bce_loss(pred, target) + dice_loss(pred, target)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-
-# 確保儲存資料夾存在
 os.makedirs("weights", exist_ok=True)
 
-# 訓練迴圈
 num_epochs = 10
 best_loss = float("inf")
 loss_history = []
+dice_history = []
+val_loss_history = []
 
 for epoch in range(num_epochs):
     model.train()
@@ -139,28 +144,69 @@ for epoch in range(num_epochs):
     loss_history.append(avg_loss)
     print(f"✅ Epoch {epoch+1}, Loss: {avg_loss:.4f}")
 
-    # 儲存最佳模型
+    # 驗證 Loss 計算
+    model.eval()
+    val_loss = 0.0
+    TP = FP = FN = 0
+    for images, masks in val_loader:
+        images = images.to(device)
+        masks = masks.to(device)
+        with torch.no_grad():
+            preds = model(images)
+            val_loss += combined_loss(preds, masks).item()
+            preds = torch.sigmoid(preds) > 0.5
+            TP += ((preds == 1) & (masks == 1)).sum().item()
+            FP += ((preds == 1) & (masks == 0)).sum().item()
+            FN += ((preds == 0) & (masks == 1)).sum().item()
+
+    avg_val_loss = val_loss / len(val_loader)
+    val_loss_history.append(avg_val_loss)
+    epoch_dice = (2 * TP) / (2 * TP + FP + FN + 1e-6)
+    dice_history.append(epoch_dice)
+
     if avg_loss < best_loss:
         best_loss = avg_loss
         torch.save(model.state_dict(), "weights/unet_task3_best.pt")
         print(f"💾 儲存最佳模型（loss: {best_loss:.4f}）")
 
-    # 每個 epoch 隨機顯示一張預測圖
     random_idx = random.randint(0, len(val_dataset) - 1)
     visualize_prediction(model, val_dataset, index=random_idx, device=device)
 
-# 最終儲存模型
+# 儲存模型
 torch.save(model.state_dict(), "weights/unet_task3_final.pt")
 print("✅ 訓練完成，模型已儲存為 unet_task3_final.pt")
 
-# 畫出 Loss 曲線
-plt.figure()
+with open("weights/loss_history.json", "w") as f:
+    json.dump(loss_history, f)
+with open("weights/dice_history.json", "w") as f:
+    json.dump(dice_history, f)
+with open("weights/val_loss_history.json", "w") as f:
+    json.dump(val_loss_history, f)
+
+# 畫出 Loss、Val Loss、Dice 曲線
+plt.figure(figsize=(15, 4))
+plt.subplot(1, 3, 1)
 plt.plot(range(1, num_epochs + 1), loss_history, marker='o')
 plt.title("Training Loss Curve")
 plt.xlabel("Epoch")
 plt.ylabel("Loss")
 plt.grid(True)
+
+plt.subplot(1, 3, 2)
+plt.plot(range(1, num_epochs + 1), val_loss_history, marker='o', color='green')
+plt.title("Validation Loss Curve")
+plt.xlabel("Epoch")
+plt.ylabel("Val Loss")
+plt.grid(True)
+
+plt.subplot(1, 3, 3)
+plt.plot(range(1, num_epochs + 1), dice_history, marker='o', color='orange')
+plt.title("Validation Dice Curve")
+plt.xlabel("Epoch")
+plt.ylabel("Dice Score")
+plt.grid(True)
+
+plt.tight_layout()
 plt.show()
 
-# 評估模型在驗證集的分割指標
 calculate_metrics(model, val_loader, device=device)
