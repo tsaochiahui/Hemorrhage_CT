@@ -1,0 +1,28 @@
+<?xml version='1.0' encoding='us-ascii'?>
+<annotation>
+<folder>VOC2007</folder>
+<filename>0046_10.jpg</filename>
+<path>C:\Users\MiaMia\Desktop\png\set\image46\10.png</path>
+<source>
+    <database>Unknown</database>
+</source>
+<size>
+    <width>512</width>
+    <height>512</height>
+    <depth>3</depth>
+</size>
+
+<segmented>0</segmented>
+    <object>
+    <name>a</name>
+    <pose>Unspecified</pose>
+    <truncated>0</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+        <xmin>213</xmin>
+        <ymin>263</ymin>
+        <xmax>284</xmax>
+        <ymax>319</ymax>
+    </bndbox>
+</object>
+</annotation>

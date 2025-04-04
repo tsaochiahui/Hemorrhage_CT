@@ -1,0 +1,28 @@
+<?xml version="1.0" ?>
+<annotation>
+<folder>image161</folder>
+<filename>0161_15.jpg</filename>
+<path>C:\Users\MiaMia\Desktop\annotation\image161\0161_15.jpg</path>
+<source>
+    <database>Unknown</database>
+</source>
+<size>
+    <width>512</width>
+    <height>512</height>
+    <depth>3</depth>
+</size>
+
+<segmented>0</segmented>
+    <object>
+    <name>a</name>
+    <pose>Unspecified</pose>
+    <truncated>0</truncated>
+    <difficult>0</difficult>
+    <bndbox>
+        <xmin>260</xmin>
+        <ymin>216</ymin>
+        <xmax>320</xmax>
+        <ymax>278</ymax>
+    </bndbox>
+</object>
+</annotation>
