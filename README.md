@@ -1,1 +1,0 @@
-# Hemorrhage_CT
