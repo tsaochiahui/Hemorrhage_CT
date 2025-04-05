@@ -196,7 +196,7 @@ annotation檔案中標註資料如下：
             | weighted avg | 加權平均：考慮 support（樣本數），接近整體平均表現。 |
         2. 混淆矩陣
             
-            ![confusion_matrix_task1.png](PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/confusion_matrix_task1.png)
+            ![confusion_matrix_task1.png]([PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/confusion_matrix_task1.png](https://github.com/tsaochiahui/Hemorrhage_CT/blob/main/confusion_matrix_task1.png))
             
             |  | 預測為無出血 | 預測為有出血 |
             | --- | --- | --- |
