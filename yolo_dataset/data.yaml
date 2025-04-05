@@ -1,0 +1,5 @@
+path: /Users/chia-huitsao/Documents/PHE-SICH-CT-IDS/Hemorrhage_CT/yolo_dataset
+train: images/train
+val: images/val
+names:
+  0: hemorrhage
