@@ -36,10 +36,57 @@
 
 |  | 任務內容 | 預測目標 | 使用模型（常見） | 選用理由 |  | 可行性 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 任務一 | 二元分類任務 | 整張圖：有無出血？ | `ResNet`, `EfficientNet`, `VGG` | 圖像分類架構／不關心位置，只要判斷有沒有 | 資料並無**Non-Hemorrhage** | 補足正常 CT 即可 |
+| 任務一 | 二元分類任務 | 整張圖：有無出血？ | `ResNet`, `EfficientNet`, `VGG` | 圖像分類架構／不關心位置，只要判斷有沒有 | 資料並無**Non-Hemorrhage標注** | 需反推出標注 |
 | 任務二 | 出血偵測（Object Detection） | 圖中**哪裡**有出血？（框出位置） | `YOLOv8`, `Faster R-CNN`, `RetinaNet` | 偵測類模型／ 預測「框 + 類別」 |  | 可行 |
 | 任務三 | 語意分割（Segmentation） | 圖中**哪些像素**是出血？ | `U-Net`, `U-Net++`, `nnU-Net`, `SegFormer` | 分割類模型／ 預測「每一個像素」的類別 |  | 可行 |
 | **任務四** | 多類型出血分類（Multi-label Classification） | 可用於任務一～三 |  |  | 目前僅含一類（basal ganglia SICH） | 需擴充資料 |
+
+# 檔案說明
+
+<aside>
+
+### task1
+
+| 執行順序 | 檔案 | 產出資料 |  |
+| --- | --- | --- | --- |
+| 1 | merged_annotation.py | merged_annotation資料夾 |  |
+| 2 | output_label_csv.py | task1_classification_labels.csv |  |
+| 3 | task1_train_mac_cpu.py | task1_resnet18_mac.pt;task1_loss_comparison.png
+confusion_matrix_task1.png |  |
+| 4 | task1_train_mac_cpu_add_argmentation.py | task1_resnet18_mac_add_augmentayion.pt;confusion_matrix_task1_add_augmentayion.png;
+task1_loss_comparison_add_augmentayion.png
+ | Data Augmentation |
+</aside>
+
+<aside>
+
+### task2
+
+cell test  >>>. `TASK2_V2.ipynb`
+
+| 執行順序 | 檔案 | 產出資料 |  |
+| --- | --- | --- | --- |
+| 1 | task2_output_yolo_data.py | yolo_dataset資料夾 |  |
+| 2 | task2_create_data_yaml.py |  |  |
+| 3 | task2_YOLO_train.py | best.pt |  |
+| 4 | task2_output_train_result_csv.py | raining_performance_summary.png |  |
+| 5 | task2_singlepic_bndbox_show_test.py | yolo_result_0004_18.jpg | skip |
+| 6 | task2_predictions_csv.py | task1_val_predictions.csv | skip |
+| 7 | task2_predictions_with_none.py | task2_val_predictions_with_none.csv;task2_val_classification_summary.csv;task2_confusion_matrix_summary.png;task2_classification_report.txt | skip |
+| 8 | task2_output_report.py | task2_val_predictions_with_none.csv;task2_val_classification_summary.csv;task2_confusion_matrix_summary.png;task2_classification_report.txt |  |
+</aside>
+
+<aside>
+
+### task3
+
+| 執行順序 | 檔案 | 產出資料 |  |
+| --- | --- | --- | --- |
+| 1 | output_seg_dataset.py | eg_dataset資料夾 |  |
+| 2 | Unet_seqmentation_train.py |  |  |
+| 3 |  |  |  |
+| 4 |  |  |  |
+</aside>
 
 # 解題思路
 
@@ -229,7 +276,7 @@ annotation檔案中標註資料如下：
 1. 將檔案中圖面分為訓練集與驗證集檔案格式如下：
     
     ```python
-    your_dataset/
+    yolo_dataset/
     ├── images/
     │   ├── train/
     │   └── val/
@@ -238,22 +285,45 @@ annotation檔案中標註資料如下：
     │   └── val/
     ```
     
-2. 將.xml中bndbox轉成yolo格式的.txt
+    1. 所有**`merged_annotation`** 中只要.xml包含`<bndbox>`對應的圖片視為**Hemorrhage(1)**，其他標注成**Non-Hemorrhage(0)**產出空白`.txt`
+    2. 其中.txt格式如下：
     
     ```python
-    label_lines.append(f"0 {x_center:.6f} {y_center:.6f} {box_w:.6f} {box_h:.6f}")
+    <類別> <x_center> <y_center> <width> <height>
     ```
     
-    其中<class_id> 目前標注只有hemorrhage（出血）所以<class_id>都是0
+    - `x_center`, `y_center`, `width`, `height` 都是相對於圖片尺寸（0~1）
+    - **`0` 是類別（只有一類 hemorrhage）**
     
+    <aside>
+    
+    013_00~31.xml命名錯誤無法找到相對應圖片（應該是0013_00~31.xml）
+    
+    </aside>
+    
+2. 產生data.yaml
 3. 建立yolov8訓練設定檔data.yaml
     
     ```python
-    path: ./  # 專案根目錄
+    from pathlib import Path
+    
+    # 修改成你的完整資料集根路徑
+    yolo_dataset_path = Path("/Users/chia-huitsao/Documents/PHE-SICH-CT-IDS/Hemorrhage_CT/yolo_dataset")
+    
+    data_yaml = f"""
+    path: {yolo_dataset_path}
     train: images/train
     val: images/val
-    nc: 1  # 類別數（只標出 hemorrhage）
-    names: ['hemorrhage']
+    names:
+      0: hemorrhage
+    """
+    
+    # 輸出到指定位置
+    output_path = yolo_dataset_path / "data.yaml"
+    with open(output_path, "w") as f:
+        f.write(data_yaml.strip())
+    
+    print(f"✅ data.yaml 已產生於：{output_path}")
     ```
     
 4. 訓練模型
@@ -262,19 +332,66 @@ annotation檔案中標註資料如下：
     
     ```python
     from ultralytics import YOLO
+    import pandas as pd
+    import shutil
+    import os
     
-    model = YOLO("yolov8n.pt")
+    # 載入 YOLOv8 的模型（可選：yolov8n.pt, yolov8s.pt, yolov8m.pt...）
+    model = YOLO("yolov8n.pt")  # n=Nano，最輕量，適合 CPU 訓練
     
-    model.train(
-        data="data.yaml",
-        epochs=50,           
-        imgsz=512,           
-        batch=4,            
-        device="cpu",        
-        workers=0            
+    # 訓練模型
+    results = model.train(
+        data="/Users/chia-huitsao/Documents/PHE-SICH-CT-IDS/Hemorrhage_CT/yolo_dataset/data.yaml",  # ← 請確認路徑正確
+        epochs=100,
+        patience=20,
+        imgsz=512,
+        batch=4,
+        device="cpu",
+        project="runs_tensorboard",
+        name="task1_yolo",
+        verbose=True
     )
     ```
     
+    <aside>
+    
+    設定early stopping >>>>依據事後分析收斂在epochs=69,
+    
+    建議參數改成    epochs=88,patience=10,
+    
+    </aside>
+    
+    c.  訓練結果分析
+    
+    ![training_performance_summary.png](PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/training_performance_summary.png)
+    
+      
+    
+    - raining Loss Curve
+        - **🔵 Box Loss**：框的位置預測誤差（bounding box 的準確度）
+        - **🟠 Class Loss**：出血 vs 非出血 的分類誤差
+    - **mAP Performance Curve**
+        - **🔵 mAP@0.5**：預測框與標註框重疊超過 50% 就算正確 → 最常見的精準度評估指標
+        - **🟠 mAP@0.5:0.95**：不同 IoU 門檻（0.5～0.95）下的平均值 → 更嚴格更全面的指標
+            
+            <aside>
+            
+            - mAP@0.5 很快就達到 **0.99+** → 框的位置預測非常準確
+            - mAP@0.5:0.95 雖然較低（最高約 0.71），但仍穩定上升 → 模型逐漸學會處理更困難的案例
+            - `綠線` 標記 **最佳 mAP@0.5 所在 epoch（第 69 回合）** → 你可以回頭分析那個模型的表現
+            - `紅線` 為你訓練設定的上限（第 100 回合）→ 模型持續進步，所以沒有早停
+            </aside>
+            
+    - 結論
+        
+        
+        | 項目 | 結果說明 |
+        | --- | --- |
+        | 模型有學習嗎？ |  Loss 持續下降，mAP 持續上升 |
+        | 模型準確嗎？ | mAP@0.5 ≈ 0.99，代表預測框與實際非常接近 |
+        | 有過擬合嗎？ | 無，loss 沒有反彈，mAP 沒下降 |
+        | Early Stopping | 未觸發（模型一直有進步） |
+        | 可使用 epoch | 建議用 epoch=69 的模型作為最佳模型（`best.pt`） |
 5. 測試與視覺化
     1. 單一圖片測試結果
     
@@ -282,28 +399,78 @@ annotation檔案中標註資料如下：
     
     ![image.png](PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/image%201.png)
     
-    b. 將驗證集的結果輸出成Excel>>>`yolo_val_predictions.xlsx`
+    b. 將驗證集的結果輸出成Excel>>>`tas2_val_predictions_with_none.csv`
     
-    其中包含**confidence跟**bounding box 位置
+    | **image** | **class_id** | **confidence** | **x1** | **y1** | **x2** | **y2** | **class_name** |
+    | --- | --- | --- | --- | --- | --- | --- | --- |
+    | **0001_07.jpg** | none | 0.0 |  |  |  |  | Non-Hemorrhage |
+    | **0001_09.jpg** | none | 0.0 |  |  |  |  | Non-Hemorrhage |
+    | **0001_11.jpg** | none | 0.0 |  |  |  |  | Non-Hemorrhage |
+    | **0001_12.jpg** | none | 0.0 |  |  |  |  | Non-Hemorrhage |
+    | **0001_15.jpg** | 0 | 0.8223 | 230.5 | 164.7 | 329.5 | 247.5 | Hemorrhage |
+    | **0001_17.jpg** | 0 | 0.7918 | 237.1 | 178.1 | 327.6 | 246.9 | Hemorrhage |
     
-    | **image** | **class_id** | **confidence** | **xmin** | **ymin** | **xmax** | **ymax** |
-    | --- | --- | --- | --- | --- | --- | --- |
-    | 0069_21.jpg | 0 | 0.326057314872742 | 203.434783935547 | 120.868515014648 | 307.211364746094 | 180.443710327148 |
-    | 0004_18.jpg | 0 | 0.892451643943787 | 170.176330566406 | 120.84245300293 | 280.908264160156 | 200.291458129883 |
+    <aside>
     
-    c. 模型準確率結果
+    - **<class_id> =** none →Non-Hemorrhage
+    - **<class_id> = 0** →Hemorrhage
+    </aside>
     
-    | **Class** | **Precision** | **Recall** | **mAP@0.5** | **mAP@0.5:0.95** |
-    | --- | --- | --- | --- | --- |
-    | hemorrhage | 1 | 0.987094424673276 | 0.994789473684211 | 0.679480727364294 |
+    c. 模型準確率結果輸出成Excel>>>`task2_val_classification_summary.csv`
     
-    d. 混淆矩陣 >>>  hemorrhage／background 
+    | **image** | **ground_truth** | **predicted** | **classification** |
+    | --- | --- | --- | --- |
+    | **0001_07.jpg** | Non-Hemorrhage | Non-Hemorrhage | TN |
+    | **0001_09.jpg** | Non-Hemorrhage | Non-Hemorrhage | TN |
+    | **0001_11.jpg** | Non-Hemorrhage | Non-Hemorrhage | TN |
+    | **0001_12.jpg** | Hemorrhage | Non-Hemorrhage | FN |
+    | **0001_15.jpg** | Hemorrhage | Hemorrhage | TP |
     
-    ![confusion_matrix_normalized.png](PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/confusion_matrix_normalized.png)
+    d. 混淆矩陣
     
-    e. loss curve
+    ![task2_confusion_matrix_summary.png](PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/task2_confusion_matrix_summary.png)
     
-    ![task2_loss_curve.png](PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/task2_loss_curve.png)
+    <aside>
+    
+    |  | **Pred: Hemorrhage** | **Pred: Non-Hemorrhage** |
+    | --- | --- | --- |
+    | **GT: Hemorrhage** | 140 ✅ (TP) | 1 ❌ (FN) |
+    | **GT: Non-Hemorrhage** | 17 ❌ (FP) | 537 ✅ (TN) |
+    - **TP（真正例）140 張**：模型正確預測出血。
+    - **FN（假負例）1 張**：模型漏判出血。
+    - **FP（假正例）17 張**：模型誤判無出血為出血。
+    - **TN（真負例）537 張**：模型正確判定無出血。
+    
+    ```python
+    
+                    precision    recall  f1-score   support
+    
+        Hemorrhage     0.8917    0.9929    0.9396       141
+    Non-Hemorrhage     0.9981    0.9693    0.9835       554
+    
+          accuracy                         0.9741       695
+         macro avg     0.9449    0.9811    0.9616       695
+      weighted avg     0.9766    0.9741    0.9746       695
+    ```
+    
+    | 指標 | Hemorrhage | Non-Hemorrhage | 整體（Accuracy） |
+    | --- | --- | --- | --- |
+    | **Precision** | 0.8917 | 0.9981 | 模型預測為出血的結果有 89.17% 是對的。 |
+    | **Recall** | 0.9929 | 0.9693 | 模型抓到了 99.29% 的真實出血圖片，只有 1 張漏掉。 |
+    | **F1-score** | 0.9396 | 0.9835 | 出血類別整體表現平衡且優秀。 |
+    | **Accuracy** | - | - | **97.41%**，整體預測正確率很高。 |
+    - 結論
+        - **出血類別的 Recall 非常高（0.9929）** → 幾乎沒有漏判出血，非常適合臨床使用。
+        - **Non-Hemorrhage 類別的 Precision 非常高（0.9981）** → 幾乎不會誤判健康影像為出血。
+        - **稍微有點 False Positive（17 張）** → 可以考慮微調模型閾值或增加負樣本以改善。
+        - **整體 Accuracy 達到 97.4%，F1-score 平衡度也很高。**
+    - 改善
+        - 若任務的目的是「**不要漏判出血**」，那這樣的 Recall 非常合適。
+        - 若你要進一步壓低 **誤報率（FP）**，可考慮：
+            - 提高置信閾值 (`conf` 設為 0.3 ~ 0.5)
+            - 加強 Non-Hemorrhage 樣本訓練
+            - 或者使用 ensemble 模型提高穩定度
+    </aside>
     
 </aside>
 
@@ -397,4 +564,5 @@ annotation檔案中標註資料如下：
     3. add early stopping
     4. add **Dice Loss**
     5. add **BCE Loss**
+    6. add **Data Augmentation. (didn’t write)**
 </aside>
