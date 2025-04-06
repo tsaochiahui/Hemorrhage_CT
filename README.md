@@ -2,6 +2,8 @@
 
 # **題目**
 
+data source:[https://www.kaggle.com/datasets/naumanalimurad/phe-sich-ct-ids/data](https://www.kaggle.com/datasets/naumanalimurad/phe-sich-ct-ids/data)
+
 **第一階段（需一般高規 GPU 電腦即可）**
 
 **任務一：二元分類（Hemorrhage vs Non-Hemorrhage）**
@@ -43,6 +45,8 @@
 
 # 檔案說明
 
+work environments: python 3.12.4
+
 <aside>
 
 ### task1
@@ -80,12 +84,14 @@ cell test  >>>. `TASK2_V2.ipynb`
 
 ### task3
 
+cell test  >>>. `task3.ipynb`
+
 | 執行順序 | 檔案 | 產出資料 |  |
 | --- | --- | --- | --- |
-| 1 | output_seg_dataset.py | eg_dataset資料夾 |  |
-| 2 | Unet_seqmentation_train.py |  |  |
-| 3 |  |  |  |
-| 4 |  |  |  |
+| 1 | output_seg_dataset.py | seg_dataset資料夾 |  |
+| 2 | Unet_seqmentation_train.py | unet_task3_final.pt |  |
+| 3 | task3_segmentation_mask_pixel_result.py | task3_segmentation_metrics.csv/task3_segmentation_confusion_matrix.png |  |
+| 4 | task3_to_task1_result.py | task3_to_task1_confusion_matrix_val_only.png |  |
 </aside>
 
 # 解題思路
@@ -196,7 +202,7 @@ annotation檔案中標註資料如下：
             | weighted avg | 加權平均：考慮 support（樣本數），接近整體平均表現。 |
         2. 混淆矩陣
             
-            ![confusion_matrix_task1.png]([https://github.com/tsaochiahui/Hemorrhage_CT/blob/main/confusion_matrix_task1.png])
+            ![confusion_matrix_task1.png](PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/confusion_matrix_task1.png)
             
             |  | 預測為無出血 | 預測為有出血 |
             | --- | --- | --- |
@@ -397,8 +403,6 @@ annotation檔案中標註資料如下：
     
     ![image.png](PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/image.png)
     
-    ![image.png](PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/image%201.png)
-    
     b. 將驗證集的結果輸出成Excel>>>`tas2_val_predictions_with_none.csv`
     
     | **image** | **class_id** | **confidence** | **x1** | **y1** | **x2** | **y2** | **class_name** |
@@ -511,7 +515,30 @@ annotation檔案中標註資料如下：
         
         ![Snipaste_2025-04-04_15-00-36.png](PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/Snipaste_2025-04-04_15-00-36.png)
         
-    3. 評估指標：Dice score、IoU、Sensitivity、Specificity
+    3. 混淆矩陣
+        
+        ![task3_segmentation_confusion_matrix.png](PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/task3_segmentation_confusion_matrix.png)
+        
+        ### 🔍 混淆矩陣數據解析：
+        
+        |  | 預測為背景 | 預測為出血 |
+        | --- | --- | --- |
+        | **實際是背景** | `1.8e+08` ✅ | `95,282` ❌ |
+        | **實際是出血** | `28,097` ❌ | `40,000` ✅ |
+        
+        | 名稱 | 定義 | 解釋 |
+        | --- | --- | --- |
+        | **True Negative (TN)** | `背景→背景` | 模型正確預測背景（**1.8 億**個像素）✅ |
+        | **False Positive (FP)** | `背景→出血` | 模型誤把背景當成出血（9 萬像素）❌ |
+        | **False Negative (FN)** | `出血→背景` | 模型漏掉出血（2.8 萬像素）❌ |
+        | **True Positive (TP)** | `出血→出血` | 模型正確預測出血（4 萬像素）✅ |
+        
+        ### 📊 初步推論：
+        
+        - **背景量遠大於出血**：這在醫學 segmentation 任務中常見，屬於嚴重類別不平衡。
+        - **模型容易漏掉出血（FN 較高）**：代表有出血但預測為背景的像素不低。
+        - **假陽性（FP）也存在**：模型誤將正常區域預測為出血。
+    4. 評估指標：Dice score、IoU、Sensitivity、Specificity
         
         ```python
         📊 Segmentation Metrics:
@@ -538,31 +565,326 @@ annotation檔案中標註資料如下：
             
             **99.95% → 非常高，代表模型幾乎不會誤判背景為出血**
             
-        
-        <aside>
-        
-        目前模型 **對「背景」很敏感但對「出血」抓得不準**，可能是：
-        
-        ### 資料不均衡？
-        
-        - 大部分圖片都是「背景」，出血區太小
-        - 👉 可以考慮**加強資料增強（Data Augmentation）**
-        
-        ### 使用更輕量模型（ResNet34）學不到複雜模式
-        
-        - 可升級到 `resnet50` 或試試 `U-Net++`
-        
-        ### 較小的圖片尺寸（如果用的是 256x256）
-        
-        - 可考慮升級到 `512x512` 看是否改善預測區塊的細節
-        </aside>
-        
     
-8. `coding adjuest（didn’t try）`
+    <aside>
+    
+    ### 🚩segmentation mask 方式驗證NonHemorrhage/Hemorrhage
+    
+    1. 混淆矩陣
+        
+        ![task3_to_task1_confusion_matrix_val_only.png](PHE-SICH-CT-IDS%20Hemorrhage%20CT%20Scan%20Dataset%201caa492aa861805391d5fd1e2977b428/task3_to_task1_confusion_matrix_val_only.png)
+        
+    2. 評估指標：Accuracy, Precision, Recall, F1-score
+    
+    ```python
+    
+    📊任務三模型在驗證集上的分類表現：
+                    precision    recall  f1-score   support
+    
+    Non-Hemorrhage     0.9717    1.0000    0.9857       550
+        Hemorrhage     1.0000    0.8881    0.9407       143
+    
+          accuracy                         0.9769       693
+         macro avg     0.9859    0.9441    0.9632       693
+      weighted avg     0.9776    0.9769    0.9764       693
+    ```
+    
+    </aside>
+    
+- `coding adjuest（didn’t try）`
+    
+    
     1. **add save Training Loss Curve**
     2. **add Validation Loss Curve(看是否 overfitting）**
     3. add early stopping
     4. add **Dice Loss**
-    5. add **BCE Loss**
+    5. add **BCE Loss（no ground true）**
     6. add **Data Augmentation. (didn’t write)**
+    7. 預測區域跟原始圖片疊加**. (didn’t write)**
+    8. 改成GPU(”mps”)運算
+</aside>
+
+## **任務四．**(無labels資料無法實作)
+
+- 
+    
+    [note](https://www.notion.so/note-1cca492aa86180228d96ef3f637573ad?pvs=21)
+    
+
+<aside>
+
+## 結構總覽
+
+| 步驟 | 說明 |
+| --- | --- |
+| 1️⃣ | 數據格式範例（CSV） |
+| 2️⃣ | `Dataset` 類別設計（多標籤） |
+| 3️⃣ | 模型架構（ResNet + Sigmoid 輸出） |
+| 4️⃣ | 損失函數：`BCEWithLogitsLoss` |
+| 5️⃣ | 預測 & 評估指標（micro/macro F1-score） |
+
+<aside>
+
+---
+
+## 1️⃣ 假設資料格式：`task4_labels.csv`
+
+```
+csv
+複製編輯
+image,IVH,IPH,SAH
+ct1.png,1,0,1
+ct2.png,0,1,0
+ct3.png,0,0,0
+```
+
+---
+
+## 2️⃣ Dataset 類別（多標籤）
+
+```python
+python
+複製編輯
+from torch.utils.data import Dataset
+from torchvision import transforms
+from PIL import Image
+import pandas as pd
+from pathlib import Path
+import torch
+
+class MultiLabelCTDataset(Dataset):
+    def __init__(self, csv_path, image_root, transform=None):
+        self.df = pd.read_csv(csv_path)
+        self.image_root = Path(image_root)
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        image_path = self.image_root / row["image"]
+        image = Image.open(image_path).convert("RGB")
+        label = torch.tensor([row["IVH"], row["IPH"], row["SAH"]], dtype=torch.float32)
+        if self.transform:
+            image = self.transform(image)
+        return image, label
+```
+
+---
+
+## 3️⃣ 模型架構 + Sigmoid 輸出
+
+```python
+python
+複製編輯
+import torch.nn as nn
+from torchvision import models
+
+class MultiLabelResNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.backbone = models.resnet18(pretrained=True)
+        self.backbone.fc = nn.Linear(self.backbone.fc.in_features, 3)  # 三類輸出
+
+    def forward(self, x):
+        return self.backbone(x)  # 不加 Sigmoid，交給 loss 自動處理
+```
+
+---
+
+## 4️⃣ 損失函數 + Optimizer
+
+```python
+python
+複製編輯
+model = MultiLabelResNet()
+criterion = nn.BCEWithLogitsLoss()  # 多標籤用這個
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+
+```
+
+---
+
+## 5️⃣ 預測 & 評估
+
+```python
+python
+複製編輯
+from sklearn.metrics import classification_report
+
+# 預測時：
+outputs = model(images)  # shape: [B, 3]
+probs = torch.sigmoid(outputs)
+preds = (probs > 0.5).int()  # shape: [B, 3]
+
+# labels: [B, 3]
+print(classification_report(labels.cpu().numpy(), preds.cpu().numpy(), target_names=["IVH", "IPH", "SAH"]))
+
+```
+
+---
+
+## ✅ 補充建議：
+
+- **輸出 Sigmoid** 適合用於「可以同時出現多類」的任務
+- **BCE Loss** 是最適合處理這種多標籤情境的損失函數
+- 可以用 `F1-micro`（整體）或 `F1-macro`（每類平均）觀察分類效果
+</aside>
+
+<aside>
+
+## 可能結果模擬
+
+### 多標籤分類：模型輸出 logits → sigmoid 機率 → 損失計算（BCE Loss）
+
+假設我們有 2 張 CT 影像作為輸入，目標是預測 3 類出血：IVH、IPH、SAH
+
+→ 就是一個 **`[batch_size=2, num_classes=3]` 的矩陣**
+
+### 🧾 1️⃣ 模型輸出 logits（原始分數）：
+
+|  | IVH | IPH | SAH |
+| --- | --- | --- | --- |
+| 圖1 | 2.0 | -1.2 | 0.5 |
+| 圖2 | -0.5 | 0.8 | 1.5 |
+
+---
+
+### 🔁 2️⃣ 經過 **Sigmoid** 轉換成機率（每個欄位跑一次 sigmoid）：
+
+|  | IVH | IPH | SAH |
+| --- | --- | --- | --- |
+| 圖1 | 0.88 | 0.23 | 0.62 |
+| 圖2 | 0.38 | 0.69 | 0.82 |
+
+---
+
+### ✅ 3️⃣ Ground Truth（實際標籤）：
+
+|  | IVH | IPH | SAH |
+| --- | --- | --- | --- |
+| 圖1 | 1 | 0 | 1 |
+| 圖2 | 0 | 1 | 1 |
+
+---
+
+### 📉 4️⃣ BCE Loss（每個位置計算損失）：
+
+BCE loss 計算公式為：
+
+BCE(p,y)=−[y⋅log⁡(p)+(1−y)⋅log⁡(1−p)]
+
+BCE(p,y)=−[y⋅log(p)+(1−y)⋅log(1−p)]
+
+套用到每個位置，得到如下損失矩陣（可用 `.mean()` 或 `.sum()` 做總 loss）：
+
+|  | IVH | IPH | SAH |
+| --- | --- | --- | --- |
+| 圖1 | 0.13 | 0.26 | 0.47 |
+| 圖2 | 0.47 | 0.37 | 0.20 |
+
+### 5️⃣你的輸入資料回顧（模型輸出 + 預測機率 + Ground Truth）：
+
+| 圖片 | 類別 | Logit | 機率（sigmoid） | Ground Truth | BCE Loss | 解釋 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 圖1 | IVH | 2.0 | 0.88 | 1 | 0.13 | 預測很好 ✅ |
+| 圖1 | IPH | -1.2 | 0.23 | 0 | 0.26 | 機率低，正確 ✅ |
+| 圖1 | SAH | 0.5 | 0.62 | 1 | 0.47 | 有點偏，Loss較大 ❌ |
+| 圖2 | IVH | -0.5 | 0.38 | 0 | 0.47 | 有點高了，還OK 😐 |
+| 圖2 | IPH | 0.8 | 0.69 | 1 | 0.37 | 有點低了，還OK 😐 |
+| 圖2 | SAH | 1.5 | 0.82 | 1 | 0.20 | 預測不錯 ✅ |
+
+### 6️⃣ 結論
+
+|  | 解釋 |
+| --- | --- |
+| 圖1 | 確定是IVH / 確定不是IPH / 可能是SAH |
+| 圖2 | 也許不是IVH / 也許是IPH /確定是SAH |
+- **機率表示模式預測是或不是的機率;loss表示個機率的可信度**
+</aside>
+
+## 假設我這種多標籤模型有一類特別不準要怎麼處理
+
+<aside>
+
+### 😕 問題可能出在：
+
+| 問題類型 | 可能原因 |
+| --- | --- |
+| 類別不準（Recall 很低） | 資料太少、特徵不明顯、模型忽略它 |
+| 預測錯誤很多（Precision 很低） | 類別混淆度高、模型常誤判其他類為它 |
+
+---
+
+## ✅ 解法總整理（推薦從上往下試）：
+
+---
+
+### 1️⃣ 🔁 **資料層面：重新檢查類別分布**
+
+```python
+python
+複製編輯
+df["label"].value_counts()
+```
+
+- 有可能那一類（例如 SAH）樣本數太少 → 導致模型學不到
+- 解法：
+    - **資料平衡**：嘗試讓 SAH 的樣本增加（可以使用 oversampling）
+    - **資料增強**：針對該類別進行較多的圖像增強（flip, rotate, contrast）
+
+---
+
+### 2️⃣ ⚖️ **Loss 權重調整（class weighting）**
+
+讓 loss 更重視預測差的類別！
+
+```python
+python
+複製編輯
+criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([1.0, 1.0, 2.0]))
+```
+
+↑ 若第 3 類（SAH）太弱，將權重設為 2.0
+
+這樣該類錯誤時，loss 會變大 → 模型會「更努力學」那一類！
+
+---
+
+### 3️⃣ 🧠 **觀察混淆類別 → 加強區分**
+
+- 是否 IPH / SAH 類型混淆？
+- 如果是，可以：
+    - 加入 **注意力機制（Attention）**
+    - 加強圖像對比度、邊緣清晰度
+    - 用「焦點引導增強」（例如只增強腦室區）
+
+---
+
+### 4️⃣ 📊 **分開評估各類指標，監控訓練進度**
+
+訓練中 plot 每類的：
+
+- Precision / Recall / F1-score 走勢
+- 看是否只有某一類學不起來，或是過擬合
+
+---
+
+### 5️⃣ 💡 **多任務學習（進階）**
+
+> 如果某類學不好，甚至可以試著用多任務學習
+> 
+> 
+> 把它當作獨立的輸出分支來訓練 → 有時能提升泛化力
+> 
+
+---
+
+## 🎯 一句總結：
+
+> 多標籤學習中，如果某類特別不準，你可以試著「給它更多注意力」—— 不論是透過資料、loss、還是特徵提取。
+> 
+</aside>
+
 </aside>
