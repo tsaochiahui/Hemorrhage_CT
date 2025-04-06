@@ -55,10 +55,8 @@ work environments: python 3.12.4
 | --- | --- | --- | --- |
 | 1 | merged_annotation.py | merged_annotation資料夾 |  |
 | 2 | output_label_csv.py | task1_classification_labels.csv |  |
-| 3 | task1_train_mac_cpu.py | task1_resnet18_mac.pt;task1_loss_comparison.png
-confusion_matrix_task1.png |  |
-| 4 | task1_train_mac_cpu_add_argmentation.py | task1_resnet18_mac_add_augmentayion.pt;confusion_matrix_task1_add_augmentayion.png;
-task1_loss_comparison_add_augmentayion.png
+| 3 | task1_train_mac_cpu.py | task1_resnet18_mac.pt;task1_loss_comparison.png;confusion_matrix_task1.png |  |
+| 4 | task1_train_mac_cpu_add_argmentation.py | task1_resnet18_mac_add_augmentayion.pt;confusion_matrix_task1_add_augmentayion.png;task1_loss_comparison_add_augmentayion.png
  | Data Augmentation |
 </aside>
 
